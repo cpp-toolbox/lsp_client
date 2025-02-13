@@ -15,7 +15,7 @@ using JSON = nlohmann::json;
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 class LSPClientServerCommunicationWindows {
-public:
+  public:
     HANDLE parent_process_in_write; // lsp server reads from stdin
     HANDLE parent_process_out_read; // lsp server writes to stdout
     PROCESS_INFORMATION lsp_server_process;
@@ -91,8 +91,8 @@ class LSPClient { // NOTE: only tested to work with LSP 3.17 standard
 
     void run_callback_associated_with_lsp_request_id(int lsp_request_id, JSON json_lsp_response);
 
-    void did_open(const std::string &file);
-    void go_to_definition(const std::string &file, int line, int col, std::function<void(JSON)> callback);
+    void make_did_open_request(const std::string &file);
+    void make_go_to_definition_request(const std::string &file, int line, int col, std::function<void(JSON)> callback);
 
     // old stuff below
     /*void send_request(const std::string &json_request);*/

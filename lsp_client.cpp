@@ -6,7 +6,6 @@
 #include <sstream>
 #include <iostream>
 
-
 #include <string>
 #include <sstream>
 
@@ -14,11 +13,11 @@
 
 /**
  * @brief Converts a file path into a local file URI.
- * 
+ *
  * @param file_path The absolute file path.
  * @return std::string A local file URI (e.g., file:///C:/path/to/file.txt or file:///home/user/file.txt).
  */
-std::string to_file_uri(const std::string& file_path) {
+std::string to_file_uri(const std::string &file_path) {
     std::ostringstream uri;
     uri << "file://";
 
@@ -39,7 +38,6 @@ std::string to_file_uri(const std::string& file_path) {
     return uri.str();
 }
 
-
 #if defined(_WIN32) || defined(_WIN64)
 LSPClientServerCommunicationWindows::LSPClientServerCommunicationWindows(const std::string &path_to_lsp_server) {
     start_lsp_server(path_to_lsp_server);
@@ -56,13 +54,11 @@ LSPClientServerCommunicationWindows::~LSPClientServerCommunicationWindows() {
 }
 
 void LSPClientServerCommunicationWindows::start_lsp_server(const std::string &path_to_lsp_server) {
-std::cout << "start lsp server" << std::endl;
     SECURITY_ATTRIBUTES saAttr;
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-std::cout << "before creating pipes" << std::endl;
 
     if (!CreatePipe(&parent_process_out_read, &parent_process_out_write, &saAttr, 0)) {
         throw std::runtime_error("Failed to create stdout pipe");
@@ -71,7 +67,6 @@ std::cout << "before creating pipes" << std::endl;
         throw std::runtime_error("Failed to create stdin pipe");
     }
 
-std::cout << "after creating pipes" << std::endl;
 
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(STARTUPINFO));
@@ -81,7 +76,6 @@ std::cout << "after creating pipes" << std::endl;
     si.hStdInput = parent_process_in_read;
     si.dwFlags |= STARTF_USESTDHANDLES;
 
-std::cout << "before creating process" << std::endl;
 
     ZeroMemory(&lsp_server_process, sizeof(PROCESS_INFORMATION));
     if (!CreateProcess(NULL, const_cast<char *>(path_to_lsp_server.c_str()), NULL, NULL, TRUE, 0, NULL, NULL, &si,
@@ -89,7 +83,6 @@ std::cout << "before creating process" << std::endl;
         throw std::runtime_error("Failed to start LSP server");
     }
 
-std::cout << "after creating process" << std::endl;
 }
 
 int LSPClientServerCommunicationWindows::get_content_length_from_pipe() {
@@ -117,7 +110,6 @@ std::string LSPClientServerCommunicationWindows::read_from_pipe(int number_of_by
 }
 
 JSON LSPClientServerCommunicationWindows::get_json_lsp_response() {
-std::cout << "start get json lsp response" << std::endl;
     // TODO: we have to figure out why the +2 is required...
     int content_length = get_content_length_from_pipe() + 2;
 
@@ -131,7 +123,7 @@ std::cout << "start get json lsp response" << std::endl;
     try {
         JSON json_response = JSON::parse(response);
         return json_response;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::cerr << "[ERROR] JSON parsing error: " << e.what() << std::endl;
         std::cerr << "[ERROR] Raw JSON response: " << response << std::endl;
         throw;
@@ -139,10 +131,8 @@ std::cout << "start get json lsp response" << std::endl;
 }
 
 void LSPClientServerCommunicationWindows::make_json_lsp_request(const JSON &request) {
-	// TODO: was debugging why the thing crashes when the lsp client starts
-	std::cout << "about to make json lsp request" << std::endl;
-    std::string request_str =
-        "Content-Length: " + std::to_string(request.dump().size()) + "\r\n\r\n" + request.dump();
+    // TODO: was debugging why the thing crashes when the lsp client starts
+    std::string request_str = "Content-Length: " + std::to_string(request.dump().size()) + "\r\n\r\n" + request.dump();
     DWORD bytes_written;
     if (!WriteFile(parent_process_in_write, request_str.c_str(), request_str.size(), &bytes_written, NULL)) {
         throw std::runtime_error("Failed to write to pipe");
@@ -311,7 +301,6 @@ LSPClient::LSPClient(const std::string &root_project_directory, const std::strin
                      const std::string &path_to_lsp_server)
     : lsp_communication(path_to_lsp_server), language_being_used(language_being_used),
       root_project_directory(root_project_directory) {
-	      std::cout << "constructor" << std::endl;
     int request_id = UniqueIDGenerator::generate();
 
     lsp_request_id_to_lsp_method[request_id] = LSPMethod::initialize;
@@ -331,14 +320,12 @@ LSPClient::LSPClient(const std::string &root_project_directory, const std::strin
         }}
     };
     // clang-format on
-    std::cout << "before initialization request" << std::endl;
     lsp_communication.make_json_lsp_request(initialize_request);
 }
 
 LSPClient::~LSPClient() {}
 
 void LSPClient::run_callback_associated_with_lsp_request_id(int lsp_request_id, JSON json_lsp_response) {
-std::cout << "running callback start" << std::endl;
     auto it = lsp_request_id_to_callback.find(lsp_request_id);
     bool callback_exists_for_request_id = it != lsp_request_id_to_callback.end();
     if (callback_exists_for_request_id) {
@@ -351,15 +338,12 @@ std::cout << "running callback start" << std::endl;
     } else {
         std::cout << "Request ID not found: " << lsp_request_id << "\n";
     }
-std::cout << "running callback end" << std::endl;
 }
 
 // WARN: this needs to be run in a thread because it is blocking!
 void LSPClient::process_requests_and_responses() {
 
-std::cout << "running process_requests_and_responses start" << std::endl;
     JSON lsp_response = lsp_communication.get_json_lsp_response();
-std::cout << "after lsp response" << std::endl;
     bool has_id = lsp_response.count("id");
 
     if (has_id) {
@@ -375,21 +359,20 @@ std::cout << "after lsp response" << std::endl;
         } else if (is_error) {
         }
     }
-std::cout << "running process_requests_and_responses end" << std::endl;
 }
 
-void LSPClient::did_open(const std::string &file_path) {
+void LSPClient::make_did_open_request(const std::string &file_path) {
 
     std::string full_path = file_path;
     // the forward slash indicates absolute path on linux
     // the C indicates absolute path on windows
 
 #if defined(_WIN32) || defined(_WIN64)
-    if (file_path[0] != 'C') { 
+    if (file_path[0] != 'C') {
         full_path = root_project_directory + file_path;
     }
 #else
-    if (file_path[0] != '/') { 
+    if (file_path[0] != '/') {
         full_path = root_project_directory + file_path;
     }
 #endif
@@ -400,7 +383,6 @@ void LSPClient::did_open(const std::string &file_path) {
         return;
     }
 
-    std::cout << "working on did open for path: " << full_path << std::endl;
 
     std::stringstream buffer;
     buffer << file_stream.rdbuf(); // Read entire file into buffer
@@ -411,19 +393,19 @@ void LSPClient::did_open(const std::string &file_path) {
                              {"params",
                               {{"textDocument",
                                 {
-					// TODO: Was just looking here and adding in a foward slash
+                                    // TODO: Was just looking here and adding in a foward slash
                                     {"uri", to_file_uri(full_path)},
                                     {"languageId", language_being_used}, // Change if needed
                                     {"version", 1},
                                     {"text", file_contents} // Send actual file contents
                                 }}}}};
 
-    std::cout << did_open_request << std::endl;
 
     lsp_communication.make_json_lsp_request(did_open_request);
 }
 
-void LSPClient::go_to_definition(const std::string &file_path, int line, int col, std::function<void(JSON)> callback) {
+void LSPClient::make_go_to_definition_request(const std::string &file_path, int line, int col,
+                                              std::function<void(JSON)> callback) {
     int request_id = UniqueIDGenerator::generate();
 
     lsp_request_id_to_lsp_method[request_id] = LSPMethod::go_to_definition;
@@ -449,45 +431,3 @@ void LSPClient::go_to_definition(const std::string &file_path, int line, int col
 
     lsp_communication.make_json_lsp_request(go_to_definition_request);
 }
-
-/*void send_did_open(const std::string &filename, const std::string &text) {*/
-/*    nlohmann::json didOpen = {*/
-/*        {"jsonrpc", "2.0"},*/
-/*        {"method", "textDocument/didOpen"},*/
-/*        {"params",*/
-/*         {{"textDocument", {{"uri", "file://" + filename}, {"languageId", "cpp"}, {"version", 1}, {"text",
- * text}}}}}};*/
-/*    send_request(didOpen.dump());*/
-/*}*/
-/**/
-/*void goto_definition(const std::string &filename, int line, int character,*/
-/*                                const std::function<void(const std::string &, int, int)> &on_definition_found) {*/
-/**/
-/*    nlohmann::json request = {{"jsonrpc", "2.0"},*/
-/*                              {"id", 1},*/
-/*                              {"method", "textDocument/definition"},*/
-/*                              {"params",*/
-/*                               {{"textDocument", {{"uri", "file://" + filename}}},*/
-/*                                {"position", {{"line", line}, {"character", character}}}}}};*/
-/**/
-/*    send_request(request.dump()); // Send the request*/
-/**/
-/*    std::string response = read_response(); // Read the LSP server's response*/
-/*    spdlog::debug("Raw LSP Response: {}", response);*/
-/**/
-/*    try {*/
-/*        auto json_resp = nlohmann::json::parse(response);*/
-/*        if (json_resp.contains("result") && !json_resp["result"].is_null()) {*/
-/*            auto def = json_resp["result"][0]; // Assume first result is correct*/
-/*            std::string uri = def["uri"];*/
-/*            int def_line = def["range"]["start"]["line"];*/
-/*            int def_character = def["range"]["start"]["character"];*/
-/**/
-/*            on_definition_found(uri, def_line, def_character);*/
-/*        } else {*/
-/*            spdlog::info("No definition found for the given position");*/
-/*        }*/
-/*    } catch (const std::exception &e) {*/
-/*        spdlog::error("Failed to parse JSON response: {}", e.what());*/
-/*    }*/
-/*}*/
