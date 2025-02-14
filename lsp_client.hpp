@@ -10,6 +10,9 @@
 
 #include "sbpt_generated_includes.hpp"
 
+// TODO: extract out text stuff so I don't have to do this.
+#include "../../utility/text_buffer/text_buffer.hpp"
+
 using JSON = nlohmann::json;
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -75,6 +78,10 @@ class LSPClient { // NOTE: only tested to work with LSP 3.17 standard
     std::string root_project_directory;
     std::string language_being_used;
 
+    // NOTE: based on the LSP spec each document has a version number which
+    // increments on each change
+    std::unordered_map<std::string, int> document_uri_to_version;
+
     std::unordered_set<std::string> currently_opened_file_paths_relative_to_project_dir;
 
     std::map<int, LSPMethod> lsp_request_id_to_lsp_method;
@@ -91,7 +98,9 @@ class LSPClient { // NOTE: only tested to work with LSP 3.17 standard
 
     void run_callback_associated_with_lsp_request_id(int lsp_request_id, JSON json_lsp_response);
 
+    std::string get_full_path(const std::string &file_path) const;
     void make_did_open_request(const std::string &file);
+    void make_did_change_request(const std::string &file_path, const TextDiff &text_diff);
     void make_go_to_definition_request(const std::string &file, int line, int col, std::function<void(JSON)> callback);
 
     // old stuff below

@@ -38,6 +38,25 @@ std::string to_file_uri(const std::string &file_path) {
     return uri.str();
 }
 
+/**
+ * @brief Constructs the full path for a file based on the platform.
+ *
+ * @param file_path The relative or absolute file path.
+ * @return std::string The full path, adjusted for the current platform.
+ */
+std::string LSPClient::get_full_path(const std::string &file_path) const {
+#if defined(_WIN32) || defined(_WIN64)
+    if (file_path.empty() || file_path[0] != 'C') {
+        return root_project_directory + file_path;
+    }
+#else
+    if (file_path.empty() || file_path[0] != '/') {
+        return root_project_directory + file_path;
+    }
+#endif
+    return file_path;
+}
+
 #if defined(_WIN32) || defined(_WIN64)
 LSPClientServerCommunicationWindows::LSPClientServerCommunicationWindows(const std::string &path_to_lsp_server) {
     start_lsp_server(path_to_lsp_server);
@@ -59,14 +78,12 @@ void LSPClientServerCommunicationWindows::start_lsp_server(const std::string &pa
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-
     if (!CreatePipe(&parent_process_out_read, &parent_process_out_write, &saAttr, 0)) {
         throw std::runtime_error("Failed to create stdout pipe");
     }
     if (!CreatePipe(&parent_process_in_read, &parent_process_in_write, &saAttr, 0)) {
         throw std::runtime_error("Failed to create stdin pipe");
     }
-
 
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(STARTUPINFO));
@@ -76,13 +93,11 @@ void LSPClientServerCommunicationWindows::start_lsp_server(const std::string &pa
     si.hStdInput = parent_process_in_read;
     si.dwFlags |= STARTF_USESTDHANDLES;
 
-
     ZeroMemory(&lsp_server_process, sizeof(PROCESS_INFORMATION));
     if (!CreateProcess(NULL, const_cast<char *>(path_to_lsp_server.c_str()), NULL, NULL, TRUE, 0, NULL, NULL, &si,
                        &lsp_server_process)) {
         throw std::runtime_error("Failed to start LSP server");
     }
-
 }
 
 int LSPClientServerCommunicationWindows::get_content_length_from_pipe() {
@@ -363,19 +378,14 @@ void LSPClient::process_requests_and_responses() {
 
 void LSPClient::make_did_open_request(const std::string &file_path) {
 
-    std::string full_path = file_path;
-    // the forward slash indicates absolute path on linux
-    // the C indicates absolute path on windows
+    std::string full_path = get_full_path(file_path);
 
-#if defined(_WIN32) || defined(_WIN64)
-    if (file_path[0] != 'C') {
-        full_path = root_project_directory + file_path;
+    std::string uri = to_file_uri(full_path);
+
+    bool file_already_open = document_uri_to_version.find(uri) != document_uri_to_version.end();
+    if (file_already_open) {
+        return;
     }
-#else
-    if (file_path[0] != '/') {
-        full_path = root_project_directory + file_path;
-    }
-#endif
 
     std::ifstream file_stream(full_path);
     if (!file_stream) {
@@ -383,25 +393,41 @@ void LSPClient::make_did_open_request(const std::string &file_path) {
         return;
     }
 
-
     std::stringstream buffer;
-    buffer << file_stream.rdbuf(); // Read entire file into buffer
+    buffer << file_stream.rdbuf();
     std::string file_contents = buffer.str();
 
-    JSON did_open_request = {{"jsonrpc", "2.0"},
-                             {"method", "textDocument/didOpen"},
-                             {"params",
-                              {{"textDocument",
-                                {
-                                    // TODO: Was just looking here and adding in a foward slash
-                                    {"uri", to_file_uri(full_path)},
-                                    {"languageId", language_being_used}, // Change if needed
-                                    {"version", 1},
-                                    {"text", file_contents} // Send actual file contents
-                                }}}}};
-
+    JSON did_open_request = {
+        {"jsonrpc", "2.0"},
+        {"method", "textDocument/didOpen"},
+        {"params",
+         {{"textDocument",
+           {{"uri", uri}, {"languageId", language_being_used}, {"version", 1}, {"text", file_contents}}}}}};
 
     lsp_communication.make_json_lsp_request(did_open_request);
+
+    document_uri_to_version[uri] = 1;
+}
+
+void LSPClient::make_did_change_request(const std::string &file_path, const TextDiff &text_diff) {
+    std::string full_path = get_full_path(file_path);
+    std::string uri = to_file_uri(full_path);
+
+    int &version = document_uri_to_version[uri];
+    version++;
+
+    JSON did_change_request = {
+        {"jsonrpc", "2.0"},
+        {"method", "textDocument/didChange"},
+        {"params",
+         {{"textDocument", {{"uri", uri}, {"version", version}}},
+          {"contentChanges",
+           {{{"range",
+              {{"start", {{"line", text_diff.text_range.start_line}, {"character", text_diff.text_range.start_col}}},
+               {"end", {{"line", text_diff.text_range.end_line}, {"character", text_diff.text_range.end_col}}}}},
+             {"text", text_diff.new_content}}}}}}};
+
+    lsp_communication.make_json_lsp_request(did_change_request);
 }
 
 void LSPClient::make_go_to_definition_request(const std::string &file_path, int line, int col,
