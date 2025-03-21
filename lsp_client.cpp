@@ -409,23 +409,26 @@ void LSPClient::make_did_open_request(const std::string &file_path) {
     document_uri_to_version[uri] = 1;
 }
 
-void LSPClient::make_did_change_request(const std::string &file_path, const TextDiff &text_diff) {
+void LSPClient::make_did_change_request(const std::string &file_path, const TextModification &text_diff) {
     std::string full_path = get_full_path(file_path);
     std::string uri = to_file_uri(full_path);
 
     int &version = document_uri_to_version[uri];
     version++;
 
-    JSON did_change_request = {
-        {"jsonrpc", "2.0"},
-        {"method", "textDocument/didChange"},
-        {"params",
-         {{"textDocument", {{"uri", uri}, {"version", version}}},
-          {"contentChanges",
-           {{{"range",
-              {{"start", {{"line", text_diff.text_range.start_line}, {"character", text_diff.text_range.start_col}}},
-               {"end", {{"line", text_diff.text_range.end_line}, {"character", text_diff.text_range.end_col}}}}},
-             {"text", text_diff.new_content}}}}}}};
+    JSON did_change_request = {{"jsonrpc", "2.0"},
+                               {"method", "textDocument/didChange"},
+                               {"params",
+                                {{"textDocument", {{"uri", uri}, {"version", version}}},
+                                 {"contentChanges",
+                                  {{{"range",
+                                     {{"start",
+                                       {{"line", text_diff.text_range_to_replace.start_line},
+                                        {"character", text_diff.text_range_to_replace.start_col}}},
+                                      {"end",
+                                       {{"line", text_diff.text_range_to_replace.end_line},
+                                        {"character", text_diff.text_range_to_replace.end_col}}}}},
+                                    {"text", text_diff.new_content}}}}}}};
 
     lsp_communication.make_json_lsp_request(did_change_request);
 }

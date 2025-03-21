@@ -100,7 +100,7 @@ class LSPClient { // NOTE: only tested to work with LSP 3.17 standard
 
     std::string get_full_path(const std::string &file_path) const;
     void make_did_open_request(const std::string &file);
-    void make_did_change_request(const std::string &file_path, const TextDiff &text_diff);
+    void make_did_change_request(const std::string &file_path, const TextModification &text_diff);
     void make_go_to_definition_request(const std::string &file, int line, int col, std::function<void(JSON)> callback);
 
     // old stuff below
