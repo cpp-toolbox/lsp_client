@@ -162,7 +162,8 @@ LSPClientServerCommunicationLinux::LSPClientServerCommunicationLinux(const std::
     if (pipe(parent_process_in_pipe) == -1 || pipe(parent_process_out_pipe) == -1) {
         throw std::runtime_error("Failed to create pipes");
     }
-    start_lsp_server(path_to_lsp_server);
+    // NOTE: temporarily disabling the lsp server
+    // start_lsp_server(path_to_lsp_server);
 }
 
 LSPClientServerCommunicationLinux::~LSPClientServerCommunicationLinux() {
@@ -210,6 +211,7 @@ void LSPClientServerCommunicationLinux::start_lsp_server(const std::string &path
         close(parent_process_out_pipe[0]);
 
         if (path_to_lsp_server == "") {
+            // NOTE: temporariliy tuirned this off to avoid clang dep to run the program.
             execlp("clangd", "clangd", "--log=verbose", nullptr);
         } else {
         }
@@ -316,6 +318,13 @@ LSPClient::LSPClient(const std::string &root_project_directory, const std::strin
                      const std::string &path_to_lsp_server)
     : lsp_communication(path_to_lsp_server), language_being_used(language_being_used),
       root_project_directory(root_project_directory) {
+
+    bool temp_bypass = true;
+
+    if (temp_bypass) {
+        return;
+    }
+
     int request_id = UniqueIDGenerator::generate();
 
     lsp_request_id_to_lsp_method[request_id] = LSPMethod::initialize;
